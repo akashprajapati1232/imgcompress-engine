@@ -74,6 +74,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/imgcompress/engine"
-  }
+    "url": "git+https://github.com/akashprajapati1232/image-compress-npm-package.git"
+  },
+  "bugs": {
+    "url": "https://github.com/akashprajapati1232/image-compress-npm-package/issues"
+  },
+  "homepage": "https://github.com/akashprajapati1232/image-compress-npm-package#readme"
 }

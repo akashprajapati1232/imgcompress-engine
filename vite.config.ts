@@ -1,5 +1,4 @@
 import { defineConfig } from 'vite';
-import wasm from 'vite-plugin-wasm';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 
@@ -7,49 +6,37 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 export default defineConfig({
-  plugins: [
-    wasm(),
-  ],
+  plugins: [],
+  base: './',
+  assetsInclude: ['**/*.wasm'],
 
   build: {
     lib: {
-      entry: resolve(__dirname, 'src/index.ts'),
-      name: 'ImgCompressEngine',
-      formats: ['es', 'cjs'],
-      fileName: (format) => format === 'es' ? 'index.js' : 'index.cjs',
+      entry: {
+        index: resolve(__dirname, 'src/index.ts'),
+        'compression.worker': resolve(__dirname, 'src/worker/compression.worker.ts')
+      },
+      formats: ['es'],
     },
 
     rollupOptions: {
-      // Externalize dependencies so consumers can deduplicate them in their bundler
-      // and we avoid vite-plugin-top-level-await crashing on third-party worker code.
-      external: [
-        '@jsquash/jpeg',
-        '@jsquash/png',
-        '@jsquash/oxipng',
-        '@jsquash/webp',
-        '@jsquash/avif',
-        'pica'
-      ],
-
+      external: [],
       output: {
-        // Preserve module structure for tree-shaking
         preserveModules: false,
         exports: 'named',
+        chunkFileNames: '[name]-[hash].js',
+        assetFileNames: '[name][extname]'
       },
     },
 
-    // Target modern browsers that support WASM + Workers + Top-Level Await natively
     target: ['es2022', 'chrome90', 'firefox89', 'safari15', 'edge90'],
-
-    sourcemap: true,
-
-    // Do not minify — consumers control this
+    sourcemap: false,
+    assetsInlineLimit: 4096,
     minify: false,
   },
 
   worker: {
     format: 'es',
-    plugins: () => [wasm()],
   },
 
   optimizeDeps: {
@@ -72,7 +59,6 @@ export default defineConfig({
       include: ['src/**/*.ts'],
       exclude: ['src/**/*.d.ts'],
     },
-    // Browser-specific globals shim
     setupFiles: ['tests/setup.ts'],
   },
 });

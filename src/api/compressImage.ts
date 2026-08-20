@@ -18,12 +18,10 @@ import type {
   CompressSuccessResponse,
   ErrorResponse,
 } from '../worker/protocol.js';
-import { runCompressor } from '../core/Compressor.js';
+
 import { ImageCompressionError, wrapUnknownError } from '../errors/ImageCompressionError.js';
 import { formatToMime } from '../analysis/format.js';
 import { invalidImage } from '../errors/ImageCompressionError.js';
-
-import CompressionWorker from '../worker/compression.worker.js?worker';
 
 // ---------------------------------------------------------------------------
 // Worker management
@@ -32,28 +30,22 @@ import CompressionWorker from '../worker/compression.worker.js?worker';
 /**
  * Get or create the compression worker.
  *
- * We use Vite's ?worker import to get the worker class.
- * This is a common pattern for NPM library workers that avoids requiring
- * consumers to configure bundler worker plugins.
- *
- * In most real bundler setups (Vite, Webpack), the worker is separately
- * bundled. For maximum compatibility, we support both patterns:
- *   1. Vite: import via `?worker&inline` (handled at build time)
- *   2. Others: main-thread fallback
+ * Uses standard ECMAScript worker instantiation (`new URL(..., import.meta.url)`).
+ * Modern bundlers (Webpack 5, Vite, Rollup) and native browsers support this pattern
+ * out of the box, allowing the library to be framework-agnostic.
  */
 function createWorker(): Worker | null {
   if (typeof Worker === 'undefined') return null;
 
   try {
-    // When bundled with Vite, this import is replaced by an inline worker URL.
-    // For other bundlers, the worker may not be inlined and we fall back
-    // to main-thread processing.
-    //
-    // NOTE: The ?worker suffix is a Vite-specific import syntax.
-    // Other bundlers need equivalent configuration.
-    // We catch any error and fall back to main thread.
-    const worker = new CompressionWorker();
-    return worker;
+    // We point to the built .js file directly so Vite's worker plugin doesn't
+    // spawn a duplicate build pass. Both entry points are built together in vite.config.ts.
+    // String concatenation bypasses Vite's static analysis of new URL(..., import.meta.url)
+    const workerFile = 'compression.worker.js';
+    return new Worker(
+      new URL('./' + workerFile, import.meta.url),
+      { type: 'module' }
+    );
   } catch {
     return null;
   }
@@ -157,7 +149,7 @@ function compressViaWorker(
         id,
         buffer,
         fileName: file instanceof File ? file.name : 'image',
-        fileType: file instanceof File ? file.type : 'application/octet-stream',
+        fileType: file.type || 'application/octet-stream',
         fileSize: file.size,
         options: {
           auto: options.auto,
@@ -262,6 +254,7 @@ export async function compressImage(
     message: 'Web Worker unavailable. Processing on main thread may affect UI responsiveness.',
   };
 
+  const { runCompressor } = await import('../core/Compressor.js');
   const result = await runCompressor(file, options);
   return {
     ...result,
